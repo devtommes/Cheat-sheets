@@ -52,7 +52,7 @@ If you have any of these Old examples in your new async code, you're Doing It Wr
 | `Thread.Sleep`     | `await Task.Delay`                   | Wait/await for a period of time                               |
 | `Task` constructor | `Task.Run` or `TaskFactory.StartNew` | Create a code-based task                                      |
 
-The async and await keywords have done a great job of simplifying writing asynchronous code in C#, but unfortunately they can't magically protect you from getting things wrong.  I want to highlight a bunch of the most common async coding mistakes or antipatterns that I've come across in code reviews.
+The async and await keywords have done a great job of simplifying writing asynchronous code in C#, but unfortunately they can't magically protect you from getting things wrong.  I want to highlight a bunch of the most common async coding mistakes or antipatterns that I've come across in code reviews at Journaway Gmbh.
 
 Whenever you call a method that returns a Task or Task<T> you should not ignore its return value. In most cases, that means awaiting it, although there are occasions where you might keep hold of the Task to be awaited later.
 
@@ -88,7 +88,7 @@ The first is when you're in a void method, the C# compiler will allow you to add
 
 The trouble is, that the caller of MyMethod has no way to await the outcome of this method. They have no access to the Task that DoSomethingAsync returned. So you're essentially ignoring a task again.
 
-Now there are some valid use cases for async void methods. The best example would be in a Windows Forms or WPF application where you're in an event handler. Event handlers have a method signature that returns void so you can't make them return a Task.
+Now there are some valid use cases for async void methods. The best example would be in a Windows Forms or WPF application or any other applications where you're in an event handler. Event handlers have a method signature that returns void so you can't make them return a Task.
 
 So it's not necessarily a problem to see code like this:
 

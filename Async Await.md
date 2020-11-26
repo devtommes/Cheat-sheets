@@ -67,7 +67,7 @@ Because this call is not awaited, execution of the current method continues befo
 
 But in synchronous methods or task-returning methods not marked as async it appears the C# compiler is quite happy to let you do this, so remain vigilant that you don't let this mistake go unnoticed.
 
-2. Ignoring tasks
+**Ignoring tasks**
 Sometimes developers will deliberately ignore the result of an asynchronous method because they explicitly don't want to wait for it to complete. Maybe it's a long-running operation that they want to happen in the background while they get on with other work. So sometimes I see code like this:
 
     var ignoredTask = DoSomethingAsync();
@@ -76,15 +76,16 @@ The danger with this approach is that nothing is going to catch any exceptions t
 
 So use this approach with caution, and make sure the method has good exception handling. Often when I see code like this in cloud-applications, I often refactor it to post a message to a queue, whose message handler performs the background operation.
 
-3. Using async void methods
+**Using async void methods**
 Every now and then you'll find yourself in a synchronous method (i.e. one that doesn't return a Task or Task<T>) but you want to call an async method. However, without marking the method as async you can't use the await keyword. There are two ways developers work round this and both are risky.
 
 The first is when you're in a void method, the C# compiler will allow you to add the async keyword. This allows us to use the await keyword:
 
-public async void MyMethod()
-{
-    await DoSomethingAsync();
-}
+    public async void MyMethod()
+    {
+        await DoSomethingAsync();
+    }
+
 The trouble is, that the caller of MyMethod has no way to await the outcome of this method. They have no access to the Task that DoSomethingAsync returned. So you're essentially ignoring a task again.
 
 Now there are some valid use cases for async void methods. The best example would be in a Windows Forms or WPF application where you're in an event handler. Event handlers have a method signature that returns void so you can't make them return a Task.
@@ -99,7 +100,7 @@ So it's not necessarily a problem to see code like this:
 
 But in most cases, I recommend against using async void. If you can make your method return a Task, you should do so.
 
-4. Blocking on tasks with .Result or .Wait
+**Blocking on tasks with .Result or .Wait**
 Another common way that developers work around the difficulty of calling asynchronous methods from synchronous methods is by using the .Result property or .Wait method on the Task. The .Result property waits for a Task to complete, and then returns its result, which at first seems really useful. We can use it like this:
 
     public void SomeMethod()
@@ -133,18 +134,19 @@ You could do something like this, using an asynchronous factory method to build 
             var customer = await customerRepository.GetAsync(customerId);
             return new CustomerHelper(customer)
         }
-
-    private readonly Customer customer;
-    private CustomerHelper(Customer customer) 
-    {
-        this.customer = customer;
+    
+	    private readonly Customer customer;
+	    private CustomerHelper(Customer customer) 
+	    {
+	        this.customer = customer;
+	    }
     }
-}
+
 Other situations where your hands are tied are when you are implementing a third party interface that is synchronous, and cannot be changed. I've ran into this with IDispose and implementing ASP.NET MVC's ActionFilterAttribute. In these situations you either have to get very creative, or just accept that you need to introduce a blocking call, and be prepared to write lots of ConfigureAwait(false) calls elsewhere to protect against deadlocks (more on that shortly).
 
 The good news is that with modern C# development, it is becoming increasingly rare that you need to block on a task. Since C# 7.1 you could declare async Main methods for console apps, and ASP.NET Core is much more async friendly than the previous ASP.NET MVC was, meaning that you should rarely find yourself in this situation.
 
-5. Mixing ForEach with async methods
+**Mixing ForEach with async methods**
 The List<T> class has a "handy" method called ForEach that performs an Action<T> on every element in the list. If you've seen any of my LINQ talks you'll know my misgivings about this method as encourages a variety of bad practices (read this for some of the reasons to avoid ForEach). But one common threading-related misuse I see, is using ForEach to call an asynchronous method.
 
 For example, let's say we want to email all customers like this:
@@ -178,7 +180,7 @@ Some people prefer to make this into an extension method, called something like 
 await customers.ForEachAsync(async c => await SendEmailAsync(c));
 But don't mix List<T>.ForEach (or indeed Parallel.ForEach which has exactly the same problem) with asyncrhonous methods.
 
-6. Excessive parallelization
+**Excessive parallelization**
 Occasionally, a developer will identify a series of tasks that are performed sequentially as being a performance bottleneck. For example, here's some code that processes some orders sequentially:
 
     foreach(var o in orders)
@@ -197,7 +199,7 @@ What's the right approach here? Well at the very least we could consider constra
 
 If I see code like this in a distributed cloud application, it's often a sign that we should introducing some messaging so that the workload can be split into batches and handled by more than one server.
 
-7. Non-thread-safe side-effects
+**Non-thread-safe side-effects**
 If you've ever looked into functional programming (which I recommend you do even if you have no plans to switch language), you'll have come across the idea of "pure" functions. The idea of a "pure" function is that it has no side effects. It takes data in, and it returns data, but it doesn't mutate anything. Pure functions bring many benefits including inherent thread safety.
 
 Often I see asynchronous methods like this, where we've been passed a list or dictionary and in the method we modify it:
@@ -220,7 +222,7 @@ The trouble is, this code is risky as it is not thread-safe for the users list t
 
 Now we've moved the responsibility of adding the user into the list onto the caller of this method, who has a much better chance of ensuring that the list is accessed from one thread only.
 
-8. Missing ConfigureAwait(false)
+**Missing ConfigureAwait(false)**
 ConfigureAwait is not a particularly easy concept for new developers to understand, but it is an important one, and if you find yourself working on a codebase that uses .Result and .Wait it can be critical to use correctly.
 
 I won't go into great detail, but essentially the meaning of ConfigureAwait(true) is that I would like my code to continue on the same "synchronization context" after the await has completed. For example, in a WPF application, the "synchronization context" is the UI thread, and I can only make updates to UI components from that thread. So I almost always want ConfigureAwait(true) in my UI code.
@@ -243,12 +245,12 @@ There is some good news on the horizon. In ASP.NET Core there is no longer a syn
 
 But if you are working on projects that run the risk of a deadlock, you need to be very vigilant about adding the ConfigureAwait(false) calls in everywhere.
 
-9. Ignoring the async version
+**Ignoring the async version**
 Whenever a method in the .NET framework takes some time, or performs some disk or network IO, there is almost always an asynchronous version of the method you can use instead. Unfortunately, the synchronous versions remain for backwards compatibility reasons. But there is no longer any good reason to use them.
 
 So for example, prefer Task.Delay to Thread.Sleep, prefer dbContext.SaveChangesAsync to dbContext.SaveChanges and prefer fileStream.ReadAsync to fileStream.Read. These changes free up the thread-pool threads to do other more useful work, allowing your program to process a higher volume of requests.
 
-10. try catch without await
+**try catch without await**
 There's a handy optimization that you might know about. Let's suppose we have a very simple async method that only makes a single async call as the last line of the method:
 
     public async Task SendUserLoggedInMessage(Guid userId)
